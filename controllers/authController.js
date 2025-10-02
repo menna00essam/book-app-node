@@ -1,61 +1,184 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const jwt = require('jsonwebtoken');
+
+const generateAccessToken = (userId) => {
+    return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
+        expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m'
+    });
+};
+
+const generateRefreshToken = (userId) => {
+    return jwt.sign({ id: userId }, process.env.JWT_REFRESH_SECRET, {
+        expiresIn: process.env.JWT_REFRESH_EXPIRES || '7d'
+    });
+};
+
+const sanitizeUser = (user) => {
+    return {
+        id: user._id,
+        uid: user.uid,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        age: user.age,
+        books_bought_amount: user.books_bought_amount
+    };
+};
 
 const registerUser = async (req, res) => {
-    try {
-        const { name, email, password, role } = req.body;
+    const { name, email, password, age } = req.body;
 
-        const existingUser = await User.findOne({ email, isDeleted: false });
-        if (existingUser) {
-            return res.status(400).json({ message: 'User already exists' });
+    try {
+        const userExists = await User.findOne({ email });
+        if (userExists) {
+            return res.status(400).json({ message: 'User with this email already exists' });
         }
 
-        const hashedPassword = await bcrypt.hash(password, parseInt(process.env.BCRYPT_SALT_ROUNDS) || 10);
+        const user = await User.create({ name, email, password, age });
 
-        const user = await User.create({
-            name,
-            email,
-            password: hashedPassword,
-            role: role || 'user'
+        const accessToken = generateAccessToken(user._id);
+        const refreshToken = generateRefreshToken(user._id);
+
+        user.refreshToken = refreshToken;
+        await user.save();
+
+        res.status(201).json({
+            message: 'User registered successfully',
+            user: sanitizeUser(user),
+            accessToken,
+            refreshToken
         });
-
-        res.status(201).json({ message: 'User registered successfully', uid: user.uid });
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        console.error('Register Error:', err);
+        res.status(500).json({ 
+            message: 'Server error during registration', 
+            error: process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
     }
 };
 
 const loginUser = async (req, res) => {
+    const { email, password } = req.body;
+
     try {
-        const { email, password } = req.body;
+        const user = await User.findOne({ email, isDeleted: false }).select('+password');
+        
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid email or password' });
+        }
 
-        const user = await User.findOne({ email, isDeleted: false });
-        if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+        const isMatch = await user.matchPassword(password);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Invalid email or password' });
+        }
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
+        const accessToken = generateAccessToken(user._id);
+        const refreshToken = generateRefreshToken(user._id);
 
-        const token = jwt.sign(
-            { id: user._id, role: user.role },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_ACCESS_EXPIRES || '1h' }
-        );
+        user.refreshToken = refreshToken;
+        await user.save();
 
-        res.json({ message: 'Login successful', token, role: user.role, uid: user.uid });
+        res.status(200).json({
+            message: 'Login successful',
+            user: sanitizeUser(user),
+            accessToken,
+            refreshToken
+        });
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        console.error('Login Error:', err);
+        res.status(500).json({ 
+            message: 'Server error during login', 
+            error: process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
+    }
+};
+
+const refreshToken = async (req, res) => {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+        return res.status(401).json({ message: 'Refresh token is required' });
+    }
+
+    try {
+        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+       
+        const user = await User.findOne({ _id: decoded.id, refreshToken: refreshToken, isDeleted: false }).select('-password');
+
+        if (!user) {
+            return res.status(403).json({ message: 'Invalid or expired refresh token' });
+        }
+
+        const newAccessToken = generateAccessToken(user._id);
+
+        res.status(200).json({
+            message: 'Token refreshed successfully',
+            accessToken: newAccessToken
+        });
+    } catch (err) {
+        console.error('Refresh Token Error:', err);
+        
+        if (err.name === 'JsonWebTokenError') {
+            return res.status(403).json({ message: 'Invalid refresh token' });
+        }
+        
+        if (err.name === 'TokenExpiredError') {
+            return res.status(403).json({ message: 'Refresh token expired, please login again' });
+        }
+        
+        return res.status(500).json({ message: 'Server error during token refresh' });
+    }
+};
+
+const logoutUser = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        user.refreshToken = null;
+        await user.save();
+
+        res.status(200).json({ message: 'Logged out successfully' });
+    } catch (err) {
+        console.error('Logout Error:', err);
+        res.status(500).json({ message: 'Server error during logout' });
     }
 };
 
 const getUserProfile = async (req, res) => {
     try {
-        const user = await User.findOne({ _id: req.user.id, isDeleted: false }).select('-password');
-        if (!user) return res.status(404).json({ message: 'User not found' });
-        res.json(user);
+        const user = await User.findById(req.user._id).select('-password -refreshToken');
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json({
+            user: {
+                id: user._id,
+                uid: user.uid,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                age: user.age,
+                books_bought_amount: user.books_bought_amount,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
+            }
+        });
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        console.error('Get Profile Error:', err);
+        res.status(500).json({ message: 'Server error while fetching profile' });
     }
 };
 
-module.exports = { registerUser, loginUser, getUserProfile };
+module.exports = {
+    registerUser,
+    loginUser,
+    refreshToken,
+    logoutUser,
+    getUserProfile
+};
