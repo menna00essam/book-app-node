@@ -8,21 +8,23 @@ const UserSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
-    purchasedBooks: { type: Number, default: 0 }
+    purchasedBooks: { type: Number, default: 0 },
+    isDeleted: { type: Boolean, default: false }
 }, { timestamps: true });
 
 UserSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
-
     try {
-        const salt = await bcrypt.genSalt(10); 
-        this.password = await bcrypt.hash(this.password, salt); 
+        const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 10;
+        const salt = await bcrypt.genSalt(saltRounds);
+        this.password = await bcrypt.hash(this.password, salt);
         next();
     } catch (err) {
         next(err);
     }
 });
 
+// دالة مقارنة الباسورد
 UserSchema.methods.matchPassword = async function (enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };
