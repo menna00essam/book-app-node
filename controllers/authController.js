@@ -41,12 +41,18 @@ const registerUser = async (req, res) => {
     const accessToken = generateAccessToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
 
-    user.refreshToken = refreshToken;
+    user.refreshTokens.push({
+      token: refreshToken,
+      device: device || "Unknown Device",
+      ip,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
     await user.save();
 
-     res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,     
-      secure: true, 
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: true,
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -85,7 +91,12 @@ const loginUser = async (req, res) => {
     const accessToken = generateAccessToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
 
-    user.refreshToken = refreshToken;
+    user.refreshTokens.push({
+      token: refreshToken,
+      device: device || "Unknown Device",
+      ip,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
     await user.save();
 
     res.cookie("refreshToken", refreshToken, {
@@ -110,8 +121,7 @@ const loginUser = async (req, res) => {
 };
 
 const refreshToken = async (req, res) => {
-const token = req.cookies.refreshToken;
-
+  const token = req.cookies.refreshToken;
 
   if (!token) {
     return res.status(401).json({ message: "Refresh token is required" });
@@ -122,7 +132,7 @@ const token = req.cookies.refreshToken;
 
     const user = await User.findOne({
       _id: decoded.id,
-      refreshToken: token,
+      "refreshTokens.token": token,
       isDeleted: false,
     }).select("-password");
 
@@ -158,22 +168,21 @@ const token = req.cookies.refreshToken;
 };
 
 const logoutUser = async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id);
+  const token = req.cookies.refreshToken;
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  const device = req.body.device || "Unknown Device";
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+  const user = await User.findById(req.user._id);
+  if (!user) return res.status(404).json({ message: "User not found" });
 
-    user.refreshToken = null;
-    await user.save();
+  user.refreshTokens = user.refreshTokens.filter(
+    rt => !(rt.token === token || (rt.device === device && rt.ip === ip))
+  );
 
-    res.status(200).json({ message: "Logged out successfully" });
-  } catch (err) {
-    console.error("Logout Error:", err);
-    res.status(500).json({ message: "Server error during logout" });
-  }
+  await user.save();
+  res.status(200).json({ message: "Logged out from this device" });
 };
+
 
 const getUserProfile = async (req, res) => {
   try {

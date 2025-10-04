@@ -11,19 +11,30 @@ const UserSchema = new mongoose.Schema({
     age: { type: Number, min: [1, 'Age must be positive'], default: null },
     role: { type: String, enum: { values: ['user', 'admin'], message: 'Role must be either user or admin' }, default: 'user' },
     books_bought_amount: { type: Number, default: 0, min: [0, 'Books bought amount cannot be negative'] },
-    refreshToken: { type: String, select: false },
+    
+    refreshTokens: [
+        {
+            token: { type: String, required: true, select: false },
+            device: { type: String, required: true },
+             ip: { type: String, required: true },
+            createdAt: { type: Date, default: Date.now },
+            expiresAt: { type: Date, required: true }
+        }
+    ],
+
     isDeleted: { type: Boolean, default: false, select: false }
 }, { 
     timestamps: true,
     toJSON: { 
         transform: function(doc, ret) {
             delete ret.password;
-            delete ret.refreshToken;
+            delete ret.refreshTokens;
             delete ret.__v;
             return ret;
         }
     }
 });
+
 
 UserSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
