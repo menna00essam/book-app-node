@@ -16,7 +16,6 @@ const {
     updateBookValidation,
     buyBookValidation 
 } = require('../validators/book.validator');
-const validate = require('../middleware/validateMiddleware');
 const { apiLimiter } = require('../middleware/rateLimiter');
 
 /**
@@ -62,6 +61,51 @@ const { apiLimiter } = require('../middleware/rateLimiter');
  *         updatedAt:
  *           type: string
  *           format: date-time
+ */
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       required:
+ *         - name
+ *         - email
+ *         - password
+ *       properties:
+ *         uid:
+ *           type: string
+ *           description: Unique user ID
+ *         name:
+ *           type: string
+ *           description: Full name of the user
+ *         email:
+ *           type: string
+ *           description: Email address of the user
+ *         password:
+ *           type: string
+ *           description: User password (min 6 chars)
+ *         age:
+ *           type: integer
+ *           description: Age of the user
+ *         role:
+ *           type: string
+ *           enum: [user, admin]
+ *           description: Role of the user
+ *         books_bought_amount:
+ *           type: integer
+ *           description: Number of books bought by the user
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *       example:
+ *         uid: "123e4567-e89b-12d3-a456-426614174000"
+ *         name: "John Doe"
+ *         email: "john@example.com"
+ *         role: "user"
  */
 
 
@@ -194,7 +238,6 @@ router.post(
     authMiddleware, 
     roleMiddleware(['admin']), 
     createBookValidation, 
-    validate,
     apiLimiter,
     createBook
 );
@@ -285,7 +328,6 @@ router.put(
     authMiddleware, 
     roleMiddleware(['admin']), 
     updateBookValidation, 
-    validate,
     apiLimiter,
     updateBook
 );
@@ -377,7 +419,6 @@ router.post(
     authMiddleware, 
     roleMiddleware(['user']),
     buyBookValidation,
-    validate,
     apiLimiter,
     buyBook
 );

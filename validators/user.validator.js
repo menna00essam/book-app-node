@@ -1,70 +1,85 @@
-const { body, param } = require('express-validator');
+const Joi = require("joi");
+const joiValidate = require("../middleware/validateMiddleware");
 
-const updateProfileValidation = [
-    body('name')
-        .optional()
-        .notEmpty()
-        .withMessage('Name cannot be empty')
-        .isLength({ min: 2 })
-        .withMessage('Name must be at least 2 characters long'),
+// Update Profile
+const updateProfileSchema = Joi.object({
+  name: Joi.string().min(2).optional().messages({
+    "string.min": "Name must be at least 2 characters long",
+    "string.empty": "Name cannot be empty",
+  }),
+  age: Joi.number().integer().min(1).optional().messages({
+    "number.base": "Age must be a number",
+    "number.min": "Age must be a positive number",
+  }),
+  email: Joi.string().email().optional().messages({
+    "string.email": "Please provide a valid email",
+  }),
+});
 
-    body('age')
-        .optional()
-        .isInt({ min: 1 })
-        .withMessage('Age must be a positive number'),
+// Change Password
+const changePasswordSchema = Joi.object({
+  oldPassword: Joi.string().required().messages({
+    "string.empty": "Old password is required",
+  }),
+  newPassword: Joi.string()
+    .min(6)
+    .disallow(Joi.ref("oldPassword"))
+    .required()
+    .messages({
+      "string.empty": "New password is required",
+      "string.min": "New password must be at least 6 characters long",
+      "any.invalid": "New password must be different from old password",
+    }),
+});
 
-    body('email')
-        .optional()
-        .isEmail()
-        .withMessage('Please provide a valid email')
-];
+// Update Role
+const updateRoleSchema = Joi.object({
+  id: Joi.string()
+    .pattern(/^[0-9a-fA-F]{24}$/)
+    .required()
+    .messages({
+      "string.pattern.base": "Invalid user ID",
+    }),
+  role: Joi.string()
+    .valid("user", "admin")
+    .required()
+    .messages({
+      "any.only": "Role must be either user or admin",
+      "string.empty": "Role is required",
+    }),
+});
 
-const changePasswordValidation = [
-    body('oldPassword')
-        .notEmpty()
-        .withMessage('Old password is required'),
+// Delete User
+const deleteUserSchema = Joi.object({
+  id: Joi.string()
+    .pattern(/^[0-9a-fA-F]{24}$/)
+    .required()
+    .messages({
+      "string.pattern.base": "Invalid user ID",
+    }),
+});
 
-    body('newPassword')
-        .notEmpty()
-        .withMessage('New password is required')
-        .isLength({ min: 6 })
-        .withMessage('New password must be at least 6 characters long')
-        .custom((value, { req }) => {
-            if (value === req.body.oldPassword) {
-                throw new Error('New password must be different from old password');
-            }
-            return true;
-        })
-];
+// Get User By ID
+const getUserByIdSchema = Joi.object({
+  id: Joi.string()
+    .pattern(/^[0-9a-fA-F]{24}$/)
+    .required()
+    .messages({
+      "string.pattern.base": "Invalid user ID",
+    }),
+});
 
-const updateRoleValidation = [
-    param('id')
-        .isMongoId()
-        .withMessage('Invalid user ID'),
-
-    body('role')
-        .notEmpty()
-        .withMessage('Role is required')
-        .isIn(['user', 'admin'])
-        .withMessage('Role must be either user or admin')
-];
-
-const deleteUserValidation = [
-    param('id')
-        .isMongoId()
-        .withMessage('Invalid user ID')
-];
-
-const getUserByIdValidation = [
-    param('id')
-        .isMongoId()
-        .withMessage('Invalid user ID')
-];
+// Wrap with joiValidate
+const updateProfileValidation = joiValidate(updateProfileSchema);
+const changePasswordValidation = joiValidate(changePasswordSchema);
+const updateRoleValidation = joiValidate(updateRoleSchema);
+const deleteUserValidation = joiValidate(deleteUserSchema, "params");
+const getUserByIdValidation = joiValidate(getUserByIdSchema, "params");
 
 module.exports = {
-    updateProfileValidation,
-    changePasswordValidation,
-    updateRoleValidation,
-    deleteUserValidation,
-    getUserByIdValidation
+  updateProfileValidation,
+  changePasswordValidation,
+  updateRoleValidation,
+  deleteUserValidation,
+  getUserByIdValidation,
 };

@@ -15,7 +15,6 @@ const {
     deleteUserValidation,
     getUserByIdValidation
 } = require('../validators/user.validator');
-const validate = require('../middleware/validateMiddleware');
 const { passwordLimiter, apiLimiter } = require('../middleware/rateLimiter'); 
 
 const router = express.Router();
@@ -27,9 +26,6 @@ const router = express.Router();
  *   description: User management routes
  */
 
-// ============================================
-// 🔥 User's Own Profile Routes
-// ============================================
 
 /**
  * @swagger
@@ -110,9 +106,7 @@ router.put('/me/password', authMiddleware,passwordLimiter ,changePassword);
  */
 router.delete('/me', authMiddleware, deleteOwnAccount);
 
-// ============================================
-// 🔥 Admin Routes
-// ============================================
+
 
 /**
  * @swagger
@@ -174,7 +168,7 @@ router.get('/', authMiddleware, roleMiddleware(['admin']), apiLimiter, getAllUse
  *       404:
  *         description: User not found
  */
-router.get('/:id', authMiddleware, roleMiddleware(['admin']), getUserByIdValidation, validate, apiLimiter, getUserById);
+router.get('/:id', authMiddleware, roleMiddleware(['admin']), apiLimiter, getUserByIdValidation, getUserById);
 
 /**
  * @swagger
@@ -214,7 +208,7 @@ router.get('/:id', authMiddleware, roleMiddleware(['admin']), getUserByIdValidat
  *       404:
  *         description: User not found
  */
-router.put('/:id/role', authMiddleware, roleMiddleware(['admin']), updateRoleValidation, validate, apiLimiter, updateUserRole);
+router.put('/:id/role', authMiddleware, roleMiddleware(['admin']), apiLimiter, updateRoleValidation, updateUserRole);
 
 /**
  * @swagger
@@ -239,6 +233,6 @@ router.put('/:id/role', authMiddleware, roleMiddleware(['admin']), updateRoleVal
  *       404:
  *         description: User not found
  */
-router.delete('/:id', authMiddleware, roleMiddleware(['admin']), deleteUserValidation, validate, apiLimiter, deleteUser);
+router.delete('/:id', authMiddleware, roleMiddleware(['admin']), apiLimiter, deleteUserValidation, deleteUser);
 
 module.exports = router;

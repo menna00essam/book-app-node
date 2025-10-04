@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 
+
 const UserSchema = new mongoose.Schema({
     uid: { type: String, default: uuidv4, unique: true, immutable: true },
     name: { type: String, required: [true, 'Name is required'], trim: true, minlength: [2, 'Name must be at least 2 characters'] },

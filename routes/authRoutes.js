@@ -8,7 +8,6 @@ const {
 } = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
 const { registerValidation, loginValidation } = require('../validators/auth.validator');
-const validate = require('../middleware/validateMiddleware');
 const { authLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
@@ -55,7 +54,7 @@ const router = express.Router();
  *       400:
  *         description: Bad request
  */
-router.post('/register', authLimiter,registerValidation, validate, registerUser);
+router.post('/register', authLimiter,registerValidation, registerUser);
 
 /**
  * @swagger
@@ -85,7 +84,7 @@ router.post('/register', authLimiter,registerValidation, validate, registerUser)
  *       401:
  *         description: Invalid credentials
  */
-router.post('/login',authLimiter, loginValidation, validate, loginUser);
+router.post('/login',authLimiter, loginValidation, loginUser);
 
 /**
  * @swagger

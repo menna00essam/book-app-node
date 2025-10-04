@@ -8,6 +8,7 @@ const bookRoutes = require('./routes/bookRoutes');
 const userRoutes = require('./routes/userRoutes');
 const { errorHandler } = require('./middleware/errorMiddleware');
 const { swaggerUi, swaggerSpec } = require('./swagger');
+const cookieParser = require('cookie-parser');
 
 dotenv.config();
 connectDB();
@@ -16,6 +17,7 @@ const app = express();
 
 app.use(express.json());
 app.use(helmet());
+app.use(cookieParser());
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 // Routes
